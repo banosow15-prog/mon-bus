@@ -22,6 +22,13 @@
   <div id="clock" class="clock">--:--</div>
 </header>
 
+<button id="dir" class="dir">
+  <span id="dir-from">Pôle Bus</span>
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span id="dir-to">Briffaut</span>
+  <span class="swap"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Inverser</span>
+</button>
+
 <main>
   <!-- Horaires -->
   <section id="v-times" class="view">
@@ -39,7 +46,7 @@
     <hr class="thick">
     <div class="leave">
       <div>
-        <p class="eyebrow big">Partir de chez soi</p>
+        <p class="eyebrow big" id="leave-label">Partir de chez soi</p>
         <p class="leave-time" id="leave-time">--:--</p>
         <p class="leave-in" id="leave-in"></p>
       </div>
@@ -82,8 +89,10 @@
       <legend>Lignes</legend>
       <div id="set-lines" class="chips"></div>
     </fieldset>
-    <label for="set-walk">Marche jusqu'à l'arrêt <output id="o-walk"></output></label>
+    <label for="set-walk">Marche jusqu'à Pôle Bus (aller) <output id="o-walk"></output></label>
     <input type="range" id="set-walk" min="1" max="20">
+    <label for="set-walk-back">Marche jusqu'à Briffaut (retour) <output id="o-walk-back"></output></label>
+    <input type="range" id="set-walk-back" min="1" max="20">
     <label for="set-margin">Marge de sécurité <output id="o-margin"></output></label>
     <input type="range" id="set-margin" min="0" max="10">
     <button class="done" value="ok">Terminé</button>

@@ -44,6 +44,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--ink); outli
   font-variant-numeric: tabular-nums;
 }
 
+.dir {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px));
+  padding: 9px 10px 9px 16px;
+  border: 1.5px solid var(--rule); border-radius: 14px; background: var(--paper);
+  font-size: 17px; font-weight: 500; cursor: pointer; text-align: left;
+}
+.dir .swap { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 500; background: var(--ink); color: var(--bg); padding: 6px 12px; border-radius: 99px; }
+.dir:active .swap { opacity: .75; }
 main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .view {
   flex: 1;

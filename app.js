@@ -11,9 +11,11 @@ const LIVE_EVERY = 30000, VEH_EVERY = 15000, WEATHER_EVERY = 30 * MIN, GLIDE = 2
 const $ = (id) => document.getElementById(id);
 
 // ---------- Réglages (gardés sur le téléphone) ----------
-const settings = { lines: ["C2", "C5"], walk: 5, margin: 1 };
+/** dir : 0 = aller (Pôle Bus → Briffaut), 1 = retour. walk / walkBack : marche jusqu'à l'arrêt de départ. */
+const settings = { lines: ["C2", "C5"], walk: 5, walkBack: 5, margin: 1, dir: 0 };
 try { Object.assign(settings, JSON.parse(localStorage.getItem("monbus") || "{}")); } catch (e) {}
 function saveSettings() { try { localStorage.setItem("monbus", JSON.stringify(settings)); } catch (e) {} }
+const walk = () => (settings.dir ? settings.walkBack : settings.walk);
 const lineSet = () => new Set(settings.lines.map((l) => l.toUpperCase()));
 
 // ---------- Heure de Paris ----------
@@ -221,7 +223,7 @@ function compute() {
     }
   }
   runs.sort((a, b) => a.real - b.real);
-  const need = (settings.walk + settings.margin) * MIN;
+  const need = (walk() + settings.margin) * MIN;
   runs = runs.filter((r) => r.real - need >= now - 20000);
   for (const r of runs) {
     if (r.real > runs[0].real + 45 * MIN) break;
@@ -268,7 +270,9 @@ async function fetchWeather() {
 }
 
 /** Météo et carte centrées sur l'arrêt de départ (pas d'adresse personnelle dans ce site public). */
-const spot = () => (data ? data.from.pos : VALENCE);
+const spot = () => (data ? data.dirs[0].from.pos : VALENCE);
+/** Le sens choisi : {from, to, leave, deps}. */
+const cur = () => data.dirs[settings.dir] || data.dirs[0];
 
 // ---------- Affichage : horaires ----------
 function render() {
@@ -279,10 +283,11 @@ function render() {
 }
 
 function renderTimes(now) {
-  const to = data ? data.to.label : "Briffaut", from = data ? data.from.label : "Pôle Bus";
+  const to = data ? cur().to.label : "Briffaut", from = data ? cur().from.label : "Pôle Bus";
+  if (data) $("leave-label").textContent = cur().leave;
   $("next-to").textContent = "Prochain bus vers " + to;
   $("next-at").textContent = "Passage à " + from;
-  $("walk-min").textContent = settings.walk + " min";
+  $("walk-min").textContent = walk() + " min";
   document.querySelectorAll(".from-label").forEach((e) => (e.textContent = from));
   const r = best;
   if (!r) {
@@ -300,7 +305,7 @@ function renderTimes(now) {
     : r.delayMin < 0 ? `● Temps réel · ${-r.delayMin} min d'avance` : "● Temps réel · à l'heure";
   $("next-status").textContent = `${st} · arrivée à ${to} ${hm(r.arr)}`;
   $("next-time").textContent = hm(r.real);
-  const leave = r.real - (settings.walk + settings.margin) * MIN, urgent = leave - now < MIN;
+  const leave = r.real - (walk() + settings.margin) * MIN, urgent = leave - now < MIN;
   $("leave-time").textContent = hm(leave);
   $("leave-in").textContent = urgent ? "Pars maintenant !" : inMin(leave - now + MIN - 1);
   $("leave-in").classList.toggle("now", urgent);
@@ -374,7 +379,7 @@ function drawRoutes() {
     L.polyline(s.pts, { color: c ? "#" + c[1] : "#161616", weight: 4, opacity: 1, interactive: false }).addTo(routeLayer);
     all.push(...s.pts);
   }
-  for (const st of [data.from, data.to]) {
+  for (const st of [data.dirs[0].from, data.dirs[0].to]) {
     L.marker(st.pos, { icon: L.divIcon({ className: "", html: '<div class="stop"></div>', iconSize: [20, 20] }), interactive: false, zIndexOffset: -100 })
       .bindTooltip(st.label, { permanent: true, direction: "right", offset: [10, 0], className: "stop-label" }).addTo(routeLayer);
     all.push(st.pos);
@@ -399,7 +404,9 @@ function renderMap(now) {
     const [, , name] = color(m.v.route);
     const stale = m.v.ts && now / 1000 - m.v.ts > 300;
     if (!lines.has(name.toUpperCase()) || stale) { if (m.marker) { m.marker.remove(); m.marker = null; m.key = null; } continue; }
-    const kind = !byTrip.has(m.v.trip) ? "other" : best && m.v.trip === best.d.trip ? "mine" : "toward";
+    // Un bus qui a déjà atteint la destination continue sa ligne : il ne compte plus.
+    const r = byTrip.get(m.v.trip), done = r && passed(r, now) && r.arr < now - MIN;
+    const kind = !r || done ? "other" : best && m.v.trip === best.d.trip ? "mine" : "toward";
     if (kind === "mine") mine = m; else if (kind === "toward") toward.push(m);
     const size = kind === "mine" ? 36 : kind === "toward" ? 30 : 20;
     const key = kind + m.v.bearing + m.v.route;
@@ -411,7 +418,7 @@ function renderMap(now) {
     }
   }
 
-  const to = data ? data.to.label : "Briffaut", from = data ? data.from.label : "Pôle Bus";
+  const to = data ? cur().to.label : "Briffaut", from = data ? cur().from.label : "Pôle Bus";
   $("toward").textContent = "Vers " + to;
   const age = Math.round((now - vehAt) / 1000);
   $("live").textContent = !vehAt ? "Recherche des bus…" : age > 120 ? "○ Positions indisponibles" : `● En direct · il y a ${age} s`;
@@ -471,6 +478,25 @@ function show(v) {
 $("t-times").onclick = () => show("times");
 $("t-map").onclick = () => show("map");
 
+// ---------- Sens aller / retour ----------
+function setDir(d) {
+  settings.dir = d === 1 ? 1 : 0;
+  const c = cur();
+  deps = c.deps.map(([trip, service, line, stop, dep, arr, seq, aseq]) => ({ trip, service, line, stop, dep, arr, seq, aseq }));
+  depByTrip = new Map(deps.map((x) => [x.trip, x]));
+  live = new Map(); liveAt = 0; lastLive = 0;
+  for (const m of marks.values()) m.key = null;
+  $("dir-from").textContent = c.from.label;
+  $("dir-to").textContent = c.to.label;
+  $("dir").setAttribute("aria-label", `Sens : ${c.from.label} vers ${c.to.label}. Changer de sens`);
+}
+$("dir").onclick = () => {
+  if (!data) return;
+  setDir(1 - settings.dir);
+  saveSettings();
+  tick();
+};
+
 function openSettings() {
   const all = data ? [...new Set(Object.values(data.routes).map((r) => r[0]))].sort() : settings.lines;
   const chosen = lineSet();
@@ -479,6 +505,8 @@ function openSettings() {
     return `<label><input type="checkbox" value="${n}" ${chosen.has(n.toUpperCase()) ? "checked" : ""}><i style="--c:${r ? "#" + r[1] : "#161616"}"></i>${n}</label>`;
   }).join("");
   $("set-walk").value = settings.walk;
+  $("set-walk-back").value = settings.walkBack;
+  $("o-walk-back").textContent = settings.walkBack + " min";
   $("set-margin").value = settings.margin;
   $("o-walk").textContent = settings.walk + " min";
   $("o-margin").textContent = settings.margin + " min";
@@ -486,11 +514,13 @@ function openSettings() {
 }
 $("gear").onclick = openSettings;
 $("set-walk").oninput = (e) => ($("o-walk").textContent = e.target.value + " min");
+$("set-walk-back").oninput = (e) => ($("o-walk-back").textContent = e.target.value + " min");
 $("set-margin").oninput = (e) => ($("o-margin").textContent = e.target.value + " min");
 $("settings").addEventListener("close", () => {
   const lines = [...$("set-lines").querySelectorAll("input:checked")].map((i) => i.value);
   if (lines.length) settings.lines = lines;
   settings.walk = +$("set-walk").value;
+  settings.walkBack = +$("set-walk-back").value;
   settings.margin = +$("set-margin").value;
   saveSettings();
   fitted = false;
@@ -511,8 +541,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) { la
 async function start() {
   try {
     data = await (await fetch("data.json")).json();
-    deps = data.deps.map(([trip, service, line, stop, dep, arr, seq, aseq]) => ({ trip, service, line, stop, dep, arr, seq, aseq }));
-    depByTrip = new Map(deps.map((d) => [d.trip, d]));
+    setDir(settings.dir);
   } catch (e) {
     $("next-status").textContent = "Impossible de charger les horaires. Vérifie la connexion.";
   }

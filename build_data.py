@@ -63,7 +63,7 @@ def main():
         data = urllib.request.urlopen(req, timeout=120).read()
     z = zipfile.ZipFile(io.BytesIO(data))
 
-    origin, dest, pos = set(), set(), {FROM: [], TO: []}
+    origin, dest, pos = set(), set(), {FROM: [], TO: []}  # arrêts côté maison / côté fac
     for r in rows(z, "stops.txt"):
         n = r["stop_name"].strip().upper()
         if n in pos:
@@ -75,27 +75,37 @@ def main():
                               r.get("route_text_color") or "FFFFFF"] for r in rows(z, "routes.txt")}
     trips = {r["trip_id"]: (r["route_id"], r["service_id"], r.get("shape_id", "")) for r in rows(z, "trips.txt")}
 
-    o_hit, d_hit = {}, defaultdict(list)
+    # Passages de chaque course aux deux arrêts : (heure de départ, heure d'arrivée, n° d'ordre, stop_id).
+    hits = {FROM: defaultdict(list), TO: defaultdict(list)}
     for r in rows(z, "stop_times.txt"):
         s = r["stop_id"]
-        if s not in origin and s not in dest:
+        side = FROM if s in origin else TO if s in dest else None
+        if side is None:
             continue
-        t, seq = r["trip_id"], int(r["stop_sequence"])
-        if s in origin and (t not in o_hit or seq < o_hit[t][1]):
-            o_hit[t] = (secs(r["departure_time"] or r["arrival_time"]), seq, s)
-        if s in dest:
-            d_hit[t].append((secs(r["arrival_time"] or r["departure_time"]), seq))
+        dep = secs(r["departure_time"] or r["arrival_time"])
+        arr = secs(r["arrival_time"] or r["departure_time"])
+        hits[side][r["trip_id"]].append((dep, arr, int(r["stop_sequence"]), s))
 
-    deps, used = [], set()
-    for t, (dep, seq, stop) in o_hit.items():
-        after = [d for d in d_hit.get(t, []) if d[1] > seq]
-        if not after or t not in trips:
-            continue
-        arr, aseq = min(after, key=lambda d: d[1])
-        route, service, _ = trips[t]
-        used.add(route)
-        deps.append([t, service, routes[route][0], stop, dep, arr, seq, aseq])
-    deps.sort(key=lambda d: d[4])
+    used = set()
+
+    def between(a, b):
+        """Courses qui passent à l'arrêt a puis à l'arrêt b."""
+        out = []
+        for t, at_a in hits[a].items():
+            if t not in trips or t not in hits[b]:
+                continue
+            dep, _, seq, stop = min(at_a, key=lambda h: h[2])
+            after = [h for h in hits[b][t] if h[2] > seq]
+            if not after:
+                continue
+            _, arr, aseq, _ = min(after, key=lambda h: h[2])
+            route, service, _ = trips[t]
+            used.add(route)
+            out.append([t, service, routes[route][0], stop, dep, arr, seq, aseq])
+        out.sort(key=lambda d: d[4])
+        return out
+
+    go, back = between(FROM, TO), between(TO, FROM)
 
     weekly = []
     if "calendar.txt" in z.namelist():
@@ -119,15 +129,19 @@ def main():
         shapes.append({"line": routes[shape_route[sh]][0],
                        "pts": [[round(a, 5), round(b, 5)] for a, b in line]})
 
+    home = {"name": FROM, "label": "Pôle Bus", "pos": centre[FROM]}
+    fac = {"name": TO, "label": "Briffaut", "pos": centre[TO]}
     out = {
-        "from": {"name": FROM, "label": "Pôle Bus", "pos": centre[FROM]},
-        "to": {"name": TO, "label": "Briffaut", "pos": centre[TO]},
+        # Sens 0 : aller (maison → fac), sens 1 : retour.
+        "dirs": [{"from": home, "to": fac, "leave": "Partir de chez soi", "deps": go},
+                 {"from": fac, "to": home, "leave": "Partir de la fac", "deps": back}],
         "routes": {k: v for k, v in routes.items() if k in used},
         "weekly": weekly, "added": added, "removed": removed,
-        "deps": deps, "shapes": shapes,
+        "shapes": shapes,
     }
     OUT.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False), "utf-8")
-    print(f"{OUT.name} : {len(deps)} passages, {len(shapes)} tracés, {OUT.stat().st_size // 1024} Ko")
+    print(f"{OUT.name} : aller {len(go)} passages, retour {len(back)}, {len(shapes)} tracés, "
+          f"{OUT.stat().st_size // 1024} Ko")
 
 
 if __name__ == "__main__":
