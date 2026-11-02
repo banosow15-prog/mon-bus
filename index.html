@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mon bus</title>
+<meta name="theme-color" content="#EEEEEA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1 id="title">Mon bus</h1>
+  <button id="gear" class="icon-btn" aria-label="Réglages">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6c-.6.3-1.2.6-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+  </button>
+  <div id="clock" class="clock">--:--</div>
+</header>
+
+<main>
+  <!-- Horaires -->
+  <section id="v-times" class="view">
+    <div class="next">
+      <div class="next-l">
+        <p class="eyebrow" id="next-to">Prochain bus vers Briffaut</p>
+        <p class="line" id="next-line">…</p>
+        <p class="status" id="next-status">Chargement des horaires…</p>
+      </div>
+      <div class="next-r">
+        <p class="eyebrow" id="next-at">Passage à Pôle Bus</p>
+        <p class="pass" id="next-time">--:--</p>
+      </div>
+    </div>
+    <hr class="thick">
+    <div class="leave">
+      <div>
+        <p class="eyebrow big">Partir de chez soi</p>
+        <p class="leave-time" id="leave-time">--:--</p>
+        <p class="leave-in" id="leave-in"></p>
+      </div>
+      <div class="walk">
+        <svg viewBox="-50 -100 100 180" aria-hidden="true"><circle cx="12" cy="-78" r="17" fill="currentColor"/><g fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><path d="M6-50-6 8"/><path d="M-30-8-14-40 6-46 22-18 42-10"/><path d="M-36 72-20 36-6 8 22 38 26 74"/></g></svg>
+        <div><b id="walk-min">5 min</b><span>pour rejoindre l'arrêt <span class="from-label">Pôle Bus</span></span></div>
+      </div>
+    </div>
+    <hr>
+    <h2>Prochains bus</h2>
+    <ol class="runs" id="runs"></ol>
+    <hr>
+    <div class="weather" id="weather"></div>
+  </section>
+
+  <!-- Carte -->
+  <section id="v-map" class="view" hidden>
+    <div id="map" class="map" role="img" aria-label="Carte des bus en direct"></div>
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="toward">Vers Briffaut</h2>
+        <p class="live" id="live">Recherche des bus…</p>
+      </div>
+      <ol class="rows" id="rows"></ol>
+      <p class="note" id="note" hidden></p>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Pages">
+  <button id="t-times" class="on">Horaires</button>
+  <button id="t-map">Carte en direct</button>
+</nav>
+
+<dialog id="settings">
+  <form method="dialog" id="settings-form">
+    <h2>Réglages</h2>
+    <fieldset>
+      <legend>Lignes</legend>
+      <div id="set-lines" class="chips"></div>
+    </fieldset>
+    <label for="set-walk">Marche jusqu'à l'arrêt <output id="o-walk"></output></label>
+    <input type="range" id="set-walk" min="1" max="20">
+    <label for="set-margin">Marge de sécurité <output id="o-margin"></output></label>
+    <input type="range" id="set-margin" min="0" max="10">
+    <button class="done" value="ok">Terminé</button>
+  </form>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
