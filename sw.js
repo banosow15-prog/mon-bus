@@ -1,5 +1,5 @@
 // Garde l'appli et les horaires pour l'ouvrir même sans réseau ; le temps réel passe toujours par Internet.
-const CACHE = "monbus-3";
+const CACHE = "monbus-4";
 const SHELL = ["./", "index.html", "style.css", "app.js", "data.json", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", (e) => {

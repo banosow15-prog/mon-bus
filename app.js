@@ -12,7 +12,7 @@ const $ = (id) => document.getElementById(id);
 
 // ---------- Réglages (gardés sur le téléphone) ----------
 /** dir : 0 = aller (Pôle Bus → Briffaut), 1 = retour. walk / walkBack : marche jusqu'à l'arrêt de départ. */
-const settings = { lines: ["C2", "C5"], walk: 5, walkBack: 5, margin: 1, dir: 0 };
+const settings = { lines: ["C2", "C5"], walk: 5, walkBack: 5, margin: 1, dir: 0, auto: true };
 try { Object.assign(settings, JSON.parse(localStorage.getItem("monbus") || "{}")); } catch (e) {}
 function saveSettings() { try { localStorage.setItem("monbus", JSON.stringify(settings)); } catch (e) {} }
 const walk = () => (settings.dir ? settings.walkBack : settings.walk);
@@ -493,9 +493,34 @@ function setDir(d) {
 $("dir").onclick = () => {
   if (!data) return;
   setDir(1 - settings.dir);
+  manualAt = Date.now(); // choix à la main : la position ne le change plus pendant cette utilisation
+  $("dir-auto").hidden = true;
   saveSettings();
   tick();
 };
+
+/* Sens automatique : plus près de Briffaut que de Pôle Bus → retour, sinon aller.
+   Un choix fait à la main reste valable tant que l'appli n'a pas été quittée plus de 10 minutes. */
+let manualAt = 0, hiddenAt = 0;
+function dist(a, b) {
+  const k = Math.cos((a[0] * Math.PI) / 180);
+  return Math.hypot(a[0] - b[0], (a[1] - b[1]) * k);
+}
+function autoDir() {
+  if (!data || !settings.auto || manualAt || !("geolocation" in navigator)) return;
+  navigator.geolocation.getCurrentPosition((p) => {
+    if (manualAt) return;
+    const me = [p.coords.latitude, p.coords.longitude], go = data.dirs[0];
+    const d = dist(me, go.to.pos) < dist(me, go.from.pos) ? 1 : 0;
+    $("dir-auto").hidden = false;
+    if (d !== settings.dir) { setDir(d); saveSettings(); tick(); }
+  }, () => { $("dir-auto").hidden = true; }, { enableHighAccuracy: false, maximumAge: 5 * MIN, timeout: 20000 });
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (hiddenAt && Date.now() - hiddenAt > 10 * MIN) manualAt = 0;
+  autoDir();
+});
 
 function openSettings() {
   const all = data ? [...new Set(Object.values(data.routes).map((r) => r[0]))].sort() : settings.lines;
@@ -508,6 +533,7 @@ function openSettings() {
   $("set-walk-back").value = settings.walkBack;
   $("o-walk-back").textContent = settings.walkBack + " min";
   $("set-margin").value = settings.margin;
+  $("set-auto").checked = settings.auto;
   $("o-walk").textContent = settings.walk + " min";
   $("o-margin").textContent = settings.margin + " min";
   $("settings").showModal();
@@ -522,6 +548,10 @@ $("settings").addEventListener("close", () => {
   settings.walk = +$("set-walk").value;
   settings.walkBack = +$("set-walk-back").value;
   settings.margin = +$("set-margin").value;
+  const auto = $("set-auto").checked;
+  if (auto && !settings.auto) { settings.auto = true; manualAt = 0; autoDir(); }
+  settings.auto = auto;
+  if (!auto) $("dir-auto").hidden = true;
   saveSettings();
   fitted = false;
   for (const m of marks.values()) m.key = null;
@@ -552,6 +582,7 @@ async function start() {
   show(v === "map" ? "map" : "times");
   tick();
   setInterval(tick, 5000);
+  autoDir();
   requestAnimationFrame(animate);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }

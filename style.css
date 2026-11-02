@@ -52,6 +52,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--ink); outli
   font-size: 17px; font-weight: 500; cursor: pointer; text-align: left;
 }
 .dir .swap { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 500; background: var(--ink); color: var(--bg); padding: 6px 12px; border-radius: 99px; }
+.dir .auto { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 400; color: var(--mute); }
+dialog label.check { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; font-size: 15px; margin-top: 4px; }
+label.check input { width: 20px; height: 20px; accent-color: var(--ink); }
+label.check small { grid-column: 2; font-size: 12.5px; color: var(--mute); }
 .dir:active .swap { opacity: .75; }
 main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .view {
